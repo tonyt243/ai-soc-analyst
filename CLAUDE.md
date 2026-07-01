@@ -45,18 +45,18 @@ place.
 
 ## v1 scope
 
-- [ ] Hand-written agent loop (`app/agent/loop.py`): stream from Claude,
+- [x] Hand-written agent loop (`app/agent/loop.py`): stream from Claude,
       execute tool calls, feed results back, repeat until `submit_verdict`
       is called or the model ends its turn.
-- [ ] 4 tools: `enrich_ip`, `lookup_cve`, `get_log_context` (investigation
+- [x] 4 tools: `enrich_ip`, `lookup_cve`, `get_log_context` (investigation
       tools, stubbed with synthetic data), `submit_verdict` (terminal tool —
       calling it ends the investigation).
-- [ ] 5 synthetic alert generators: SSH brute force, Log4Shell exploitation,
+- [x] 5 synthetic alert generators: SSH brute force, Log4Shell exploitation,
       port scan, data exfiltration, suspicious PowerShell.
-- [ ] SSE endpoint that streams every agent-loop event (thinking deltas,
+- [x] SSE endpoint that streams every agent-loop event (thinking deltas,
       tool-call start/input/result, text, final verdict, token usage) to
       the frontend as they happen.
-- [ ] Live token/cost meter — accumulate `usage` across every turn of the
+- [x] Live token/cost meter — accumulate `usage` across every turn of the
       loop and compute running cost from the model's per-token pricing.
 - [ ] Glass-box UI (Next.js): a feed of every thought/tool call as it
       streams, plus the meter and the final verdict card.
@@ -106,28 +106,45 @@ backend/
 the next work session. Everything else in this list is either fully working
 scaffolding or a clearly-marked stub returning synthetic data.
 
-## Agent loop design (for the next session)
+## Agent loop design
 
-Rough shape of `AgentLoop.run()`:
+Implemented in `app/agent/loop.py`. Shape of `AgentLoop.run()`:
 
 1. Build initial `messages` = `[{"role": "user", "content": alert_summary}]`.
-2. Loop:
+2. Loop (capped at `MAX_TURNS = 15` — a safety net in case a confused model
+   never calls `submit_verdict`):
    - Call `client.messages.stream(model=..., system=SYSTEM_PROMPT,
      tools=TOOLS, thinking={"type": "adaptive", "display": "summarized"},
-     messages=messages)`.
-   - As stream events arrive, translate each to a glass-box SSE event
-     (thinking delta, text delta, tool-call started) and yield it upward.
-   - On `stream.get_final_message()`, append the assistant turn to
-     `messages`.
-   - If `stop_reason != "tool_use"`: the model ended its turn without
-     calling `submit_verdict` — this is a bug in the prompt/loop, not a
-     normal exit; log and surface it.
-   - Execute each `tool_use` block via `tool_handlers`. If one of them is
-     `submit_verdict`, capture its input as the final verdict and stop
-     the loop after sending the (trivial) tool_result back.
-   - Append a `user` turn with all `tool_result` blocks, continue the loop.
-3. Track `usage` (input/output/cache tokens) from every turn for the cost
-   meter; emit a running total as its own SSE event type.
+     output_config={"effort": ...}, messages=messages)`.
+   - As raw stream events arrive, translate `thinking_delta`/`text_delta`
+     content-block deltas to glass-box SSE events and yield them upward.
+     Tool-call inputs are *not* streamed incrementally — they're read off
+     the accumulated final message instead (simpler, and the JSON input for
+     these tools is small enough that the latency difference is invisible).
+   - On `stream.get_final_message()`, accumulate `usage` into a running
+     total and emit it as a `UsageUpdate` (cost computed via
+     `app/agent/pricing.py`).
+   - `stop_reason` of `refusal`, `max_tokens`, or anything other than
+     `tool_use` ends the investigation with an `InvestigationError` — the
+     model is expected to always reach a verdict via a tool call.
+   - Execute each `tool_use` block via `tool_handlers`. `submit_verdict`'s
+     input gets parsed into the `Verdict` pydantic model — if that raises
+     (the model sent a malformed verdict), the tool_result comes back
+     `is_error=True` and the loop continues instead of crashing, giving the
+     model a chance to retry with valid fields.
+   - If a valid verdict was captured this turn: emit `VerdictReady` and
+     stop (no need to round-trip the trivial tool_result back to the API).
+   - Otherwise: append the assistant turn (full `message.content`, which
+     preserves thinking blocks for continued reasoning) and a user turn
+     with all `tool_result` blocks, then continue the loop.
+
+Router wiring: `get_agent_loop()` in `loop.py` is a FastAPI dependency
+(`app/routers/investigate.py`) — this is what makes the router trivially
+testable via `app.dependency_overrides` without hitting the real API (see
+`tests/test_investigate.py`). `tests/test_agent_loop.py` tests the loop
+itself against a fake Anthropic client (`tests/fakes.py`) that implements
+just the `messages.stream()` async-context-manager surface the loop
+actually touches — no network calls, no API key needed to run the suite.
 
 ## Glass-box UI requirements
 

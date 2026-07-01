@@ -17,3 +17,11 @@ def _reset_alert_store():
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    # AgentLoop tests are async (@pytest.mark.anyio); this is anyio's
+    # required backend-selection fixture. asyncio is the only backend we
+    # need — no trio dependency to add.
+    return "asyncio"

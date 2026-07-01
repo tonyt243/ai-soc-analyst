@@ -12,16 +12,16 @@ an agentic loop clearly, not to hide them behind an abstraction.
 
 ## Status
 
-Backend scaffold is up and tested; the agent loop itself is next.
+Backend is functionally complete for v1 except the frontend and deploy.
 
 | Piece | Status |
 |---|---|
 | 5 synthetic alert generators (SSH brute force, Log4Shell, port scan, data exfiltration, suspicious PowerShell) | ✅ done |
 | Alert API (`generate` / `list` / `get`) | ✅ done |
-| SSE event contract + streaming endpoint | ✅ scaffolded, tested |
 | Tool schemas + stub handlers (`enrich_ip`, `lookup_cve`, `get_log_context`, `submit_verdict`) | ✅ done |
-| Hand-written Claude tool-use agent loop | 🚧 next |
-| Live token/cost meter | 🚧 depends on the loop |
+| Hand-written Claude tool-use agent loop | ✅ done |
+| SSE event contract + streaming endpoint | ✅ done |
+| Live token/cost meter | ✅ done |
 | Glass-box frontend (Next.js) | ⏳ not started |
 | Deploy (Railway + Vercel) | ⏳ not started |
 

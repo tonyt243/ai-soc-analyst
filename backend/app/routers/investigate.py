@@ -1,9 +1,11 @@
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
+from app.agent.loop import AgentLoop, get_agent_loop
 from app.alerts import store
+from app.alerts.models import Alert
 from app.schemas.events import InvestigationError
 from app.streaming.sse import to_sse
 
@@ -11,19 +13,22 @@ router = APIRouter(prefix="/investigate", tags=["investigate"])
 
 
 @router.get("/{alert_id}/stream")
-async def stream_investigation(alert_id: str) -> EventSourceResponse:
+async def stream_investigation(
+    alert_id: str, agent_loop: AgentLoop = Depends(get_agent_loop)
+) -> EventSourceResponse:
     alert = store.get(alert_id)
     if alert is None:
         raise HTTPException(status_code=404, detail="alert not found")
 
-    return EventSourceResponse(_not_implemented_stream())
+    return EventSourceResponse(_stream(agent_loop, alert))
 
 
-async def _not_implemented_stream() -> AsyncGenerator[dict[str, str], None]:
-    # AgentLoop.run() (app/agent/loop.py) isn't implemented yet — this keeps
-    # the endpoint shape real so the frontend can be built against it now.
-    yield to_sse(
-        InvestigationError(
-            message="Agent loop not implemented yet — see app/agent/loop.py"
-        )
-    )
+async def _stream(agent_loop: AgentLoop, alert: Alert) -> AsyncGenerator[dict[str, str], None]:
+    try:
+        async for event in agent_loop.run(alert):
+            yield to_sse(event)
+    except Exception as exc:
+        # Last-resort guard: an unhandled exception here (network failure,
+        # API error) should end the SSE stream with a visible error event,
+        # not hang the connection or 500 mid-stream.
+        yield to_sse(InvestigationError(message=f"Unexpected error: {exc}"))
