@@ -12,9 +12,11 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # macOS/Linux
 
-pip install -r requirements.txt
-copy .env.example .env        # then fill in ANTHROPIC_API_KEY
+pip install -r requirements-dev.txt   # includes requirements.txt + pytest/httpx
+copy .env.example .env                # then fill in ANTHROPIC_API_KEY
 ```
+
+(Just running the server, no tests? `pip install -r requirements.txt` is enough.)
 
 ## Run
 
@@ -27,6 +29,17 @@ uvicorn app.main:app --reload
 - `POST /alerts/generate` — generate a synthetic alert (body: `{"type": "ssh_brute_force"}`, or `{}` for random)
 - `GET /alerts` — list generated alerts (in-memory, resets on restart)
 - `GET /investigate/{alert_id}/stream` — SSE stream of the investigation (not implemented yet — `app/agent/loop.py` is next)
+
+## Test
+
+```sh
+pytest
+```
+
+Covers every endpoint above except the agent-loop internals (there's nothing
+to test there yet). `tests/conftest.py` resets the in-memory alert store
+before each test — it's a module-level dict, so tests would otherwise leak
+alerts into each other.
 
 ## Status
 

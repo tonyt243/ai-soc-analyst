@@ -21,3 +21,8 @@ def get(alert_id: str) -> Alert | None:
 
 def list_all() -> list[Alert]:
     return sorted(_alerts.values(), key=lambda a: a.generated_at, reverse=True)
+
+
+def reset() -> None:
+    """Test-only: clear the store so tests don't leak alerts into each other."""
+    _alerts.clear()
