@@ -26,7 +26,7 @@ interview). `anthropic` is the only Claude-related dependency.
 | Agent loop | Hand-written, `anthropic` SDK | full control, see above |
 | Streaming (backend → frontend) | SSE (Server-Sent Events) | simpler than WebSockets for one-directional server push; native browser `EventSource` support |
 | Frontend | Next.js 15 + TypeScript + Tailwind | scaffolded in a later session |
-| Deploy | Railway (backend) + Vercel (frontend) | later phase, not v1 |
+| Deploy | Railway (backend) + Vercel (frontend) | deliberately last — see § v2 scope |
 
 ## Model
 
@@ -72,6 +72,34 @@ place.
 - Deployment — Railway/Vercel config comes once v1 works locally.
 
 These are v2/v3 candidates once the core loop and UI are solid.
+
+## v2 scope
+
+v1 is complete except deploy. Deploy is being held deliberately until after
+the two items below — the reasoning is that a live demo link is worth more
+once there's something more substantial behind it than reasoning over
+synthetic tool data, and the stack is simple enough (no DB, two services)
+that deploying late shouldn't surface any nasty surprises.
+
+Priority order:
+
+1. [ ] **Real tool integrations** — replace the stubbed `enrich_ip` and
+       `lookup_cve` handlers in `app/agent/tool_handlers.py` with live
+       calls (AbuseIPDB or similar for IP reputation, the NVD API for
+       CVEs). `get_log_context` stays synthetic — there's no real log
+       source to query. Needs basic caching/rate-limit handling per
+       provider.
+2. [ ] **Eval harness** — run the 5 alert types repeatedly against the real
+       agent loop and grade verdict consistency (right MITRE technique,
+       stable severity, remediation actually actionable). No framework
+       needed for v1 of this either — a small script is enough to start.
+3. [ ] **Deploy** — Railway (backend) + Vercel (frontend), once the above
+       make the demo worth deploying.
+
+Alert generation (`app/alerts/generators.py`) stays synthetic regardless —
+there's no real log/SIEM source in this project, by design (see the top of
+this doc: it's a demo of the agentic loop and glass-box UI, not a
+production detection product).
 
 ## Backend structure
 
