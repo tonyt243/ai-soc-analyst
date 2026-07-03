@@ -12,7 +12,7 @@ an agentic loop clearly, not to hide them behind an abstraction.
 
 ## Status
 
-Backend is functionally complete for v1 except the frontend and deploy.
+v1 is functionally complete except deploy.
 
 | Piece | Status |
 |---|---|
@@ -22,17 +22,20 @@ Backend is functionally complete for v1 except the frontend and deploy.
 | Hand-written Claude tool-use agent loop | ✅ done |
 | SSE event contract + streaming endpoint | ✅ done |
 | Live token/cost meter | ✅ done |
-| Glass-box frontend (Next.js) | ⏳ not started |
+| Glass-box frontend (Next.js) | ✅ done |
 | Deploy (Railway + Vercel) | ⏳ not started |
 
 ## Stack
 
 FastAPI (Python) backend, Claude API via a hand-written streaming tool-use
 loop, Server-Sent Events for backend→frontend streaming, Next.js 15 +
-TypeScript + Tailwind frontend (upcoming).
+TypeScript + Tailwind frontend.
 
 ## Getting started
 
 Backend setup, run, and test instructions: [`backend/README.md`](backend/README.md).
+
+Frontend: `cd frontend && npm install && cp .env.local.example .env.local && npm run dev`
+(expects the backend running at `http://localhost:8000`, see `.env.local.example`).
 
 Full project plan, architecture rationale, and design notes: [`CLAUDE.md`](CLAUDE.md).

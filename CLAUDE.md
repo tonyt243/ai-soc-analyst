@@ -58,7 +58,7 @@ place.
       the frontend as they happen.
 - [x] Live token/cost meter — accumulate `usage` across every turn of the
       loop and compute running cost from the model's per-token pricing.
-- [ ] Glass-box UI (Next.js): a feed of every thought/tool call as it
+- [x] Glass-box UI (Next.js): a feed of every thought/tool call as it
       streams, plus the meter and the final verdict card.
 
 ## Explicitly not in v1

@@ -28,7 +28,7 @@ uvicorn app.main:app --reload
 - `GET /alerts/types` — the 5 synthetic alert types
 - `POST /alerts/generate` — generate a synthetic alert (body: `{"type": "ssh_brute_force"}`, or `{}` for random)
 - `GET /alerts` — list generated alerts (in-memory, resets on restart)
-- `GET /investigate/{alert_id}/stream` — SSE stream of the investigation (not implemented yet — `app/agent/loop.py` is next)
+- `GET /investigate/{alert_id}/stream` — SSE stream of the investigation (runs the agent loop against the real Claude API — requires `ANTHROPIC_API_KEY`)
 
 ## Test
 
@@ -36,13 +36,13 @@ uvicorn app.main:app --reload
 pytest
 ```
 
-Covers every endpoint above except the agent-loop internals (there's nothing
-to test there yet). `tests/conftest.py` resets the in-memory alert store
-before each test — it's a module-level dict, so tests would otherwise leak
-alerts into each other.
+Covers every endpoint, including the agent loop itself, against a fake
+Anthropic client (`tests/fakes.py`) — no network calls or API key needed to
+run the suite. `tests/conftest.py` resets the in-memory alert store before
+each test — it's a module-level dict, so tests would otherwise leak alerts
+into each other.
 
 ## Status
 
-Everything except the agent loop itself is working today. `app/agent/loop.py`
-is scaffolded with the intended shape but raises `NotImplementedError` — see
-the design notes there and in `CLAUDE.md` § Agent loop design.
+Backend is functionally complete for v1 — see `CLAUDE.md` § Agent loop
+design for how `app/agent/loop.py` works.
