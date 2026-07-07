@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { AlertPanel } from "@/components/AlertPanel";
 import { InvestigationFeed } from "@/components/InvestigationFeed";
 import { UsageMeter } from "@/components/UsageMeter";
@@ -13,25 +14,42 @@ export default function Home() {
 
   return (
     <div className="mx-auto flex h-screen max-w-6xl gap-6 p-6">
-      <aside className="w-72 shrink-0 border-r border-slate-200 pr-6 dark:border-slate-800">
-        <h1 className="mb-4 text-lg font-bold text-slate-900 dark:text-slate-100">AI SOC Analyst</h1>
+      <aside className="w-72 shrink-0 border-r border-border pr-6">
+        <div className="mb-5 flex items-center gap-2">
+          <h1 className="text-lg font-bold tracking-tight text-text">AI SOC Analyst</h1>
+          {status === "running" && (
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+            </span>
+          )}
+        </div>
         <AlertPanel selectedAlertId={selectedAlertId} onSelect={setSelectedAlertId} disabled={status === "running"} />
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col gap-4">
         <UsageMeter usage={usage} />
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-200 p-4 dark:border-slate-800">
-          <InvestigationFeed feed={feed} />
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-surface/40 p-4">
+          <InvestigationFeed feed={feed} isLive={status === "running"} />
           {status === "running" && feed.length > 0 && (
-            <p className="mt-3 text-xs text-slate-400">Investigating…</p>
+            <p className="mt-3 flex items-center gap-1 pl-3 text-xs text-text-dim">
+              Investigating
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  animate={{ opacity: [0.2, 1, 0.2] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+                >
+                  .
+                </motion.span>
+              ))}
+            </p>
           )}
         </div>
 
         {error && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-300">
-            {error}
-          </div>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>
         )}
 
         {verdict && <VerdictCard verdict={verdict} />}
