@@ -109,7 +109,7 @@ class AgentLoop:
                 try:
                     if block.name == "submit_verdict":
                         verdict = Verdict(**block.input)
-                    output = TOOL_HANDLERS[block.name](block.input)
+                    output = await TOOL_HANDLERS[block.name](block.input)
                     tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(output)})
                     yield ToolCallResult(tool_use_id=block.id, name=block.name, output=output)
                 except (ValidationError, KeyError) as exc:

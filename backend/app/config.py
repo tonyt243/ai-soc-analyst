@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     effort: str = "high"
     cors_origins: str = "http://localhost:3000"
 
+    # Both optional: `enrich_ip`/`lookup_cve` fall back to synthetic data
+    # (app/agent/tool_handlers.py) when the corresponding key is unset, so
+    # the app and test suite work with no keys configured. NVD works
+    # unauthenticated too, just at a much lower rate limit — see
+    # app/agent/enrichment.py.
+    abuseipdb_api_key: str = ""
+    nvd_api_key: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

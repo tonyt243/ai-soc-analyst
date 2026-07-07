@@ -83,12 +83,16 @@ that deploying late shouldn't surface any nasty surprises.
 
 Priority order:
 
-1. [ ] **Real tool integrations** — replace the stubbed `enrich_ip` and
-       `lookup_cve` handlers in `app/agent/tool_handlers.py` with live
-       calls (AbuseIPDB or similar for IP reputation, the NVD API for
-       CVEs). `get_log_context` stays synthetic — there's no real log
-       source to query. Needs basic caching/rate-limit handling per
-       provider.
+1. [x] **Real tool integrations** — `enrich_ip` (AbuseIPDB) and `lookup_cve`
+       (NVD) in `app/agent/tool_handlers.py` now call live APIs via
+       `app/agent/enrichment.py`, which adds a per-provider in-memory TTL
+       cache and sliding-window rate limiter. Both fall back to the
+       original synthetic data whenever the relevant key
+       (`SOC_ABUSEIPDB_API_KEY` / `SOC_NVD_API_KEY`) is unset *or* the live
+       call fails — so the app and test suite still need zero keys and
+       zero network access by default. Add real keys to `.env` to switch
+       either tool to live mode. `get_log_context` stays synthetic — there's
+       no real log source to query.
 2. [ ] **Eval harness** — run the 5 alert types repeatedly against the real
        agent loop and grade verdict consistency (right MITRE technique,
        stable severity, remediation actually actionable). No framework
@@ -112,7 +116,11 @@ backend/
       loop.py              The hand-written tool-use loop (core of the project)
       prompts.py           System prompt — SOC analyst persona + MITRE guidance
       tools.py             Tool JSON schemas (enrich_ip, lookup_cve, get_log_context, submit_verdict)
-      tool_handlers.py     Stub implementations of each tool
+      tool_handlers.py     Tool implementations: enrich_ip/lookup_cve call
+                            enrichment.py (live, with synthetic fallback);
+                            get_log_context/submit_verdict stay synthetic
+      enrichment.py         Live AbuseIPDB/NVD clients + per-provider TTL
+                            cache and rate limiter (v2)
     alerts/
       models.py            Alert pydantic model
       generators.py        The 5 synthetic alert generators
