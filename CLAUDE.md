@@ -26,6 +26,8 @@ interview). `anthropic` is the only Claude-related dependency.
 | Agent loop | Hand-written, `anthropic` SDK | full control, see above |
 | Streaming (backend → frontend) | SSE (Server-Sent Events) | simpler than WebSockets for one-directional server push; native browser `EventSource` support |
 | Frontend | Next.js 15 + TypeScript + Tailwind | scaffolded in a later session |
+| Frontend animation | Framer Motion | feed items, verdict card, cost meter, alert controls — see § Glass-box UI requirements |
+| Markdown rendering | `react-markdown` | Claude's thinking/text/verdict output frequently contains markdown (bold, lists) — rendered, not shown as raw asterisks |
 | Deploy | Railway (backend) + Vercel (frontend) | deliberately last — see § v2 scope |
 
 ## Model
@@ -189,10 +191,17 @@ actually touches — no network calls, no API key needed to run the suite.
 ## Glass-box UI requirements
 
 - Every SSE event type from the backend gets its own visual treatment:
-  thinking (italic/muted), tool call (name + input, then result once it
-  arrives), text (normal), verdict (final card with severity color, MITRE
-  technique, remediation).
+  thinking (italic/muted, left accent border), tool call (name + input,
+  then result once it arrives), text (normal), verdict (final card with
+  severity color/glow, MITRE technique, remediation).
 - Token/cost meter updates live as usage events arrive — this is a
   deliberate "show the receipts" feature for a SOC-tooling portfolio piece.
 - Nothing is buffered until the end — if the backend streamed it, the UI
   renders it as it arrives.
+- Visual theme is a dark "SOC console" (forced dark, not OS-preference
+  dependent — see `app/globals.css` design tokens: `void`/`surface`/
+  `accent`/etc.), not the generic light/dark Tailwind default. Framer
+  Motion animates every event as it streams in (fade/slide-in feed items,
+  a blinking caret on the actively-streaming block, a spring-entrance
+  verdict card with severity-colored glow, a "ticking" cost meter) so the
+  live investigation reads as active, not static.
