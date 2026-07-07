@@ -4,13 +4,16 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { AlertPanel } from "@/components/AlertPanel";
 import { InvestigationFeed } from "@/components/InvestigationFeed";
+import { RawLogPanel } from "@/components/RawLogPanel";
 import { UsageMeter } from "@/components/UsageMeter";
 import { VerdictCard } from "@/components/VerdictCard";
+import { useAlert } from "@/hooks/useAlert";
 import { useInvestigation } from "@/hooks/useInvestigation";
 
 export default function Home() {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const { status, feed, usage, verdict, error } = useInvestigation(selectedAlertId);
+  const selectedAlert = useAlert(selectedAlertId);
 
   return (
     <div className="mx-auto flex h-screen max-w-6xl gap-6 p-6">
@@ -29,6 +32,8 @@ export default function Home() {
 
       <main className="flex min-w-0 flex-1 flex-col gap-4">
         <UsageMeter usage={usage} />
+
+        {selectedAlert && <RawLogPanel alert={selectedAlert} />}
 
         <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-surface/40 p-4">
           <InvestigationFeed feed={feed} isLive={status === "running"} />

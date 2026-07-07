@@ -17,6 +17,10 @@ export async function fetchAlerts(): Promise<Alert[]> {
   return json<Alert[]>(await fetch(`${API_BASE_URL}/alerts`));
 }
 
+export async function fetchAlert(alertId: string): Promise<Alert> {
+  return json<Alert>(await fetch(`${API_BASE_URL}/alerts/${alertId}`));
+}
+
 export async function generateAlert(type?: AlertType): Promise<Alert> {
   const res = await fetch(`${API_BASE_URL}/alerts/generate`, {
     method: "POST",
