@@ -15,7 +15,7 @@ const EVENT_NAMES: AgentEvent["type"][] = [
   "error",
 ];
 
-export type InvestigationStatus = "idle" | "running" | "done" | "error";
+export type InvestigationStatus = "idle" | "running" | "done" | "error" | "stopped";
 
 export interface InvestigationState {
   status: InvestigationStatus;
@@ -23,9 +23,10 @@ export interface InvestigationState {
   usage: UsageUpdateEvent | null;
   verdict: Verdict | null;
   error: string | null;
+  stop: () => void;
 }
 
-const INITIAL_STATE: InvestigationState = {
+const INITIAL_STATE: Omit<InvestigationState, "stop"> = {
   status: "idle",
   feed: [],
   usage: null,
@@ -37,9 +38,10 @@ const INITIAL_STATE: InvestigationState = {
 // beyond React state — every event re-renders as it arrives (see CLAUDE.md
 // § Glass-box UI requirements).
 export function useInvestigation(alertId: string | null): InvestigationState {
-  const [state, setState] = useState<InvestigationState>(INITIAL_STATE);
+  const [state, setState] = useState<Omit<InvestigationState, "stop">>(INITIAL_STATE);
   const alertIdRef = useRef(alertId);
   alertIdRef.current = alertId;
+  const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     if (!alertId) {
@@ -49,6 +51,7 @@ export function useInvestigation(alertId: string | null): InvestigationState {
 
     setState({ ...INITIAL_STATE, status: "running" });
     const source = new EventSource(investigationStreamUrl(alertId));
+    sourceRef.current = source;
 
     for (const name of EVENT_NAMES) {
       source.addEventListener(name, (raw) => {
@@ -87,5 +90,10 @@ export function useInvestigation(alertId: string | null): InvestigationState {
     return () => source.close();
   }, [alertId]);
 
-  return state;
+  function stop() {
+    sourceRef.current?.close();
+    setState((prev) => (prev.status === "running" ? { ...prev, status: "stopped" } : prev));
+  }
+
+  return { ...state, stop };
 }

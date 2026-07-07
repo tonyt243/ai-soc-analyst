@@ -12,7 +12,7 @@ import { useInvestigation } from "@/hooks/useInvestigation";
 
 export default function Home() {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
-  const { status, feed, usage, verdict, error } = useInvestigation(selectedAlertId);
+  const { status, feed, usage, verdict, error, stop } = useInvestigation(selectedAlertId);
   const selectedAlert = useAlert(selectedAlertId);
 
   return (
@@ -21,10 +21,18 @@ export default function Home() {
         <div className="mb-5 flex items-center gap-2">
           <h1 className="text-lg font-bold tracking-tight text-text">AI SOC Analyst</h1>
           {status === "running" && (
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-            </span>
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+              </span>
+              <button
+                onClick={stop}
+                className="ml-auto rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-300 transition-colors hover:border-red-500/50 hover:bg-red-500/20"
+              >
+                Stop
+              </button>
+            </>
           )}
         </div>
         <AlertPanel selectedAlertId={selectedAlertId} onSelect={setSelectedAlertId} disabled={status === "running"} />
@@ -51,6 +59,7 @@ export default function Home() {
               ))}
             </p>
           )}
+          {status === "stopped" && <p className="mt-3 pl-3 text-xs text-text-dim">Investigation stopped.</p>}
         </div>
 
         {error && (
