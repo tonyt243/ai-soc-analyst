@@ -138,15 +138,16 @@ backend/
     routers/
       alerts.py             GET/POST endpoints for listing & generating alerts
       investigate.py         GET SSE endpoint — runs the agent loop, streams events
+  eval/
+    run_eval.py            Eval harness (v2) — see § v2 scope item 2
   tests/
   requirements.txt
   .env.example
   README.md
 ```
 
-`agent/loop.py` is intentionally scaffolded but not implemented yet — that's
-the next work session. Everything else in this list is either fully working
-scaffolding or a clearly-marked stub returning synthetic data.
+Everything above is fully implemented (v1 + v2 items 1 and 2 are done — see
+§ v2 scope). Only deploy config remains.
 
 ## Agent loop design
 
@@ -188,6 +189,32 @@ itself against a fake Anthropic client (`tests/fakes.py`) that implements
 just the `messages.stream()` async-context-manager surface the loop
 actually touches — no network calls, no API key needed to run the suite.
 
+## Frontend structure
+
+```
+frontend/
+  src/
+    app/
+      page.tsx              Top-level layout: sidebar (alerts) + main panel
+      layout.tsx             Root layout, forces dark theme
+      globals.css            Dark "SOC console" design tokens (see below)
+    components/
+      AlertPanel.tsx         Generate-alert buttons + alert list (sidebar)
+      RawLogPanel.tsx        Shows the selected alert's raw_log above the feed
+      InvestigationFeed.tsx  Renders thinking/text/tool_call feed items
+      UsageMeter.tsx         Live token/cost stat bar
+      VerdictCard.tsx        Final verdict card
+      Markdown.tsx           Shared react-markdown wrapper (theme-styled)
+    hooks/
+      useInvestigation.ts    Owns the SSE EventSource; exposes state + stop()
+      useAlert.ts            Fetches full alert detail (incl. raw_log) by id
+    lib/
+      api.ts                 Backend fetch helpers
+      feed.ts                Reduces AgentEvents into FeedItems (merges deltas)
+      types.ts                Mirrors backend/app/schemas/events.py
+      labels.ts               Alert-type labels + severity color/glow tokens
+```
+
 ## Glass-box UI requirements
 
 - Every SSE event type from the backend gets its own visual treatment:
@@ -205,3 +232,14 @@ actually touches — no network calls, no API key needed to run the suite.
   a blinking caret on the actively-streaming block, a spring-entrance
   verdict card with severity-colored glow, a "ticking" cost meter) so the
   live investigation reads as active, not static.
+- Claude's thinking/text/verdict output is rendered through `react-markdown`
+  (`components/Markdown.tsx`), not raw strings — the model frequently emits
+  markdown (bold, lists) that would otherwise show up as literal asterisks.
+- The raw alert log (`Alert.raw_log`) is shown in `RawLogPanel`, pinned
+  above the feed for the whole investigation — without it there's no way
+  for a viewer to see the evidence the agent's reasoning is grounded in.
+- A **Stop** button (next to the live pulsing indicator, shown only while
+  `status === "running"`) closes the SSE connection client-side, which also
+  cancels the backend's streaming generator (`sse-starlette` detects the
+  disconnect) — so it actually halts further agent-loop turns, not just the
+  UI display. See `useInvestigation.ts`'s `stop()`.
