@@ -93,10 +93,14 @@ Priority order:
        zero network access by default. Add real keys to `.env` to switch
        either tool to live mode. `get_log_context` stays synthetic — there's
        no real log source to query.
-2. [ ] **Eval harness** — run the 5 alert types repeatedly against the real
-       agent loop and grade verdict consistency (right MITRE technique,
-       stable severity, remediation actually actionable). No framework
-       needed for v1 of this either — a small script is enough to start.
+2. [x] **Eval harness** — `backend/eval/run_eval.py` (`python -m eval.run_eval`
+       from `backend/`) runs each of the 5 alert types once through the real
+       agent loop (real Claude API) and grades each verdict: MITRE technique
+       against a per-alert-type expected family, severity against a per-type
+       expected range, and remediation actionability via a second, cheap
+       LLM-judge call (`claude-haiku-4-5` + structured outputs). One pass,
+       not a repeat loop — re-run by hand after prompt/model changes rather
+       than looping N times per invocation. No framework, just a script.
 3. [ ] **Deploy** — Railway (backend) + Vercel (frontend), once the above
        make the demo worth deploying.
 
