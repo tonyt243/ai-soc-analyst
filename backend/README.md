@@ -30,6 +30,12 @@ uvicorn app.main:app --reload
 - `GET /alerts` — list generated alerts (in-memory, resets on restart)
 - `GET /investigate/{alert_id}/stream` — SSE stream of the investigation (runs the agent loop against the real Claude API — requires `ANTHROPIC_API_KEY`)
 
+Both `POST /alerts/generate` and `GET /investigate/{alert_id}/stream` are
+rate-limited per-IP (`app/ratelimit.py`), and investigations are also capped
+by a global daily limit — this is a public-facing app that calls a paid API,
+so an unauthenticated endpoint needs a cost ceiling. In-memory, resets on
+restart; see the module docstring for the exact limits and reasoning.
+
 ## Test
 
 ```sh

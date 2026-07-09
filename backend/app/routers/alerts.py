@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.alerts import store
 from app.alerts.generators import generate_alert, generate_random_alert
 from app.alerts.models import Alert, AlertType
+from app.ratelimit import enforce_generate_limit
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -30,7 +31,7 @@ def get_alert(alert_id: str) -> Alert:
     return alert
 
 
-@router.post("/generate")
+@router.post("/generate", dependencies=[Depends(enforce_generate_limit)])
 def generate(body: GenerateAlertRequest = GenerateAlertRequest()) -> Alert:
     alert = generate_alert(body.type) if body.type else generate_random_alert()
     return store.save(alert)

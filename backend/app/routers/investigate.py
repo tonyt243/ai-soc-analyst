@@ -6,13 +6,14 @@ from sse_starlette.sse import EventSourceResponse
 from app.agent.loop import AgentLoop, get_agent_loop
 from app.alerts import store
 from app.alerts.models import Alert
+from app.ratelimit import enforce_investigate_limit
 from app.schemas.events import InvestigationError
 from app.streaming.sse import to_sse
 
 router = APIRouter(prefix="/investigate", tags=["investigate"])
 
 
-@router.get("/{alert_id}/stream")
+@router.get("/{alert_id}/stream", dependencies=[Depends(enforce_investigate_limit)])
 async def stream_investigation(
     alert_id: str, agent_loop: AgentLoop = Depends(get_agent_loop)
 ) -> EventSourceResponse:
