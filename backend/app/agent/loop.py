@@ -8,6 +8,7 @@ ends its turn without calling a tool (all three of the latter are treated
 as failures — the model is expected to always reach a verdict).
 """
 
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 from functools import lru_cache
@@ -39,6 +40,26 @@ MAX_TOKENS = 8192
 MAX_TURNS = 15
 
 _USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+
+
+async def _execute_tool(block: Any) -> tuple[dict[str, Any], ToolCallResult, Verdict | None]:
+    """Run one `tool_use` block and package its result for both the API
+    round-trip (`tool_result` dict) and the glass-box stream (`ToolCallResult`).
+
+    Callers run these concurrently via `asyncio.gather` — Claude's parallel
+    tool calls (e.g. `enrich_ip` on two different IPs) shouldn't be forced
+    through the network sequentially just because the loop yields events
+    one at a time.
+    """
+    try:
+        verdict = Verdict(**block.input) if block.name == "submit_verdict" else None
+        output = await TOOL_HANDLERS[block.name](block.input)
+        tool_result = {"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(output)}
+        return tool_result, ToolCallResult(tool_use_id=block.id, name=block.name, output=output), verdict
+    except (ValidationError, KeyError) as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+        tool_result = {"type": "tool_result", "tool_use_id": block.id, "content": error_text, "is_error": True}
+        return tool_result, ToolCallResult(tool_use_id=block.id, name=block.name, output=error_text, is_error=True), None
 
 
 def _alert_prompt(alert: Alert) -> str:
@@ -98,27 +119,26 @@ class AgentLoop:
                 )
                 return
 
+            tool_use_blocks = [block for block in message.content if block.type == "tool_use"]
+            for block in tool_use_blocks:
+                yield ToolCallStarted(tool_use_id=block.id, name=block.name, input=block.input)
+
             tool_results: list[dict[str, Any]] = []
             verdict: Verdict | None = None
+            any_error = False
 
-            for block in message.content:
-                if block.type != "tool_use":
-                    continue
+            for tool_result, tool_event, block_verdict in await asyncio.gather(
+                *(_execute_tool(block) for block in tool_use_blocks)
+            ):
+                tool_results.append(tool_result)
+                yield tool_event
+                if block_verdict is not None:
+                    verdict = block_verdict
+                if tool_event.is_error:
+                    any_error = True
 
-                yield ToolCallStarted(tool_use_id=block.id, name=block.name, input=block.input)
-                try:
-                    if block.name == "submit_verdict":
-                        verdict = Verdict(**block.input)
-                    output = await TOOL_HANDLERS[block.name](block.input)
-                    tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(output)})
-                    yield ToolCallResult(tool_use_id=block.id, name=block.name, output=output)
-                except (ValidationError, KeyError) as exc:
-                    verdict = None
-                    error_text = f"{type(exc).__name__}: {exc}"
-                    tool_results.append(
-                        {"type": "tool_result", "tool_use_id": block.id, "content": error_text, "is_error": True}
-                    )
-                    yield ToolCallResult(tool_use_id=block.id, name=block.name, output=error_text, is_error=True)
+            if any_error:
+                verdict = None
 
             if verdict is not None:
                 yield VerdictReady(verdict=verdict.model_dump())

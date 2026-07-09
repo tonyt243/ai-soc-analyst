@@ -170,11 +170,18 @@ Implemented in `app/agent/loop.py`. Shape of `AgentLoop.run()`:
    - `stop_reason` of `refusal`, `max_tokens`, or anything other than
      `tool_use` ends the investigation with an `InvestigationError` — the
      model is expected to always reach a verdict via a tool call.
-   - Execute each `tool_use` block via `tool_handlers`. `submit_verdict`'s
-     input gets parsed into the `Verdict` pydantic model — if that raises
-     (the model sent a malformed verdict), the tool_result comes back
-     `is_error=True` and the loop continues instead of crashing, giving the
-     model a chance to retry with valid fields.
+   - Execute all `tool_use` blocks from the turn concurrently via
+     `asyncio.gather` (`_execute_tool` in `loop.py`) — Claude can request
+     several tools in one turn (e.g. `enrich_ip` on two IPs) and there's no
+     reason to serialize independent network calls. `ToolCallStarted` is
+     emitted for every block up front, then `ToolCallResult`s stream once
+     the gather resolves, in the same order as the blocks (not completion
+     order). `submit_verdict`'s input gets parsed into the `Verdict`
+     pydantic model — if that raises (the model sent a malformed verdict),
+     the tool_result comes back `is_error=True` and the loop continues
+     instead of crashing, giving the model a chance to retry with valid
+     fields; an error on *any* block in the turn invalidates a verdict
+     parsed elsewhere in that same turn.
    - If a valid verdict was captured this turn: emit `VerdictReady` and
      stop (no need to round-trip the trivial tool_result back to the API).
    - Otherwise: append the assistant turn (full `message.content`, which

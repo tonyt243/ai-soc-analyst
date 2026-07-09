@@ -82,6 +82,42 @@ async def test_happy_path_tool_call_then_verdict():
 
 
 @pytest.mark.anyio
+async def test_multiple_tool_calls_in_one_turn_all_execute():
+    # Claude can request several tool_use blocks in a single turn; the loop
+    # runs them concurrently (see _execute_tool in loop.py) but must still
+    # report a started/result pair for every block, matched by tool_use_id.
+    turn_1 = (
+        [],
+        FakeMessage(
+            content=[
+                FakeContentBlock("tool_use", id="tu_1", name="enrich_ip", input={"ip": "1.2.3.4"}),
+                FakeContentBlock("tool_use", id="tu_2", name="enrich_ip", input={"ip": "5.6.7.8"}),
+            ],
+            stop_reason="tool_use",
+        ),
+    )
+    turn_2 = (
+        [],
+        FakeMessage(
+            content=[FakeContentBlock("tool_use", id="tu_3", name="submit_verdict", input=VALID_VERDICT_INPUT)],
+            stop_reason="tool_use",
+        ),
+    )
+    client = FakeAnthropicClient([turn_1, turn_2])
+
+    events = await _run(client)
+
+    tool_starts = [e for e in events if isinstance(e, ToolCallStarted)]
+    assert [e.tool_use_id for e in tool_starts] == ["tu_1", "tu_2", "tu_3"]
+
+    tool_results = {e.tool_use_id: e for e in events if isinstance(e, ToolCallResult)}
+    assert set(tool_results) == {"tu_1", "tu_2", "tu_3"}
+    assert all(not e.is_error for e in tool_results.values())
+
+    assert isinstance(events[-1], VerdictReady)
+
+
+@pytest.mark.anyio
 async def test_retries_after_invalid_verdict_input():
     invalid_verdict = {**VALID_VERDICT_INPUT, "confidence": 5.0}  # out of the [0, 1] range
     turn_1 = (
