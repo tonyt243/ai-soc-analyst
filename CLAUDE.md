@@ -40,6 +40,26 @@ if the number of alerts run during demos/interviews gets large, consider
 `claude-sonnet-5` for cost. Don't downgrade without deciding this
 explicitly; it's a quality/cost tradeoff, not a default.
 
+This was checked empirically, not just assumed: running `eval/run_eval.py`
+against both models (one pass, all 5 alert types) had Opus 4.8 pass 4/5
+checks at $0.33 total; Sonnet 5 passed 3/5 and got stuck in the tool-use
+loop on the log4shell alert, burning all `MAX_TURNS` without ever calling
+`submit_verdict` ($0.85 total, more expensive than Opus despite being the
+"cheap" model, because of that one runaway investigation). One pass isn't
+a statistical sample, so this isn't conclusive proof Sonnet can't do the
+job — but it's a concrete reason to keep Opus as the default rather than
+switching on the general "Sonnet 5 is near-Opus quality" reputation alone.
+Re-run the eval on both models before revisiting this.
+
+Prompt caching (`cache_control` on the system prompt / tools) was also
+considered and deliberately **not** implemented: `count_tokens` showed the
+static system+tools block is ~1,556 tokens and even a full turn-1 prompt
+tops out around ~2,100 — both under Opus 4.8's 4,096-token minimum
+cacheable prefix, so a cache breakpoint would silently do nothing for
+typical 2-4-turn investigations on the default model. It would activate on
+`claude-sonnet-5` (1,024-token minimum) or on unusually long
+investigations — revisit if either changes.
+
 Streaming is mandatory — thinking + tool calls + text over multiple
 tool-use rounds can comfortably exceed the ~16K non-streaming safety margin,
 and streaming is also what makes the glass-box UI possible in the first
@@ -104,7 +124,11 @@ Priority order:
        not a repeat loop — re-run by hand after prompt/model changes rather
        than looping N times per invocation. No framework, just a script.
 3. [ ] **Deploy** — Railway (backend) + Vercel (frontend), once the above
-       make the demo worth deploying.
+       make the demo worth deploying. Rate limiting (`app/ratelimit.py`) is
+       already in place ahead of this: per-IP + global in-memory limits on
+       `POST /alerts/generate` and `GET /investigate/{id}/stream`, so a
+       public demo link can't run up the Anthropic API bill — see the
+       module docstring for the exact numbers and reasoning.
 
 Alert generation (`app/alerts/generators.py`) stays synthetic regardless —
 there's no real log/SIEM source in this project, by design (see the top of
@@ -118,6 +142,8 @@ backend/
   app/
     main.py              FastAPI app: CORS, router mounting, health check
     config.py             Settings (API key, model, effort, CORS origins)
+    ratelimit.py           Per-IP + global in-memory rate limits on the
+                            costly public endpoints (v2 deploy prep)
     agent/
       loop.py              The hand-written tool-use loop (core of the project)
       prompts.py           System prompt — SOC analyst persona + MITRE guidance
@@ -148,6 +174,9 @@ backend/
 
 Everything above is fully implemented (v1 + v2 items 1 and 2 are done — see
 § v2 scope). Only deploy config remains.
+
+Tool calls within a single turn run concurrently (`asyncio.gather`) rather
+than sequentially — see § Agent loop design below.
 
 ## Agent loop design
 
@@ -218,9 +247,16 @@ frontend/
     lib/
       api.ts                 Backend fetch helpers
       feed.ts                Reduces AgentEvents into FeedItems (merges deltas)
+      feed.test.ts            Unit tests for feed.ts (vitest — `npm test`)
       types.ts                Mirrors backend/app/schemas/events.py
       labels.ts               Alert-type labels + severity color/glow tokens
 ```
+
+`feed.ts` is the only pure, easily-unit-tested piece of frontend logic
+(everything else is components/hooks tied to SSE + the DOM), so it's the
+one file with real test coverage — `npm test` runs vitest. Not a full
+frontend test suite by design; this project's testing investment is
+concentrated on the backend (see `backend/README.md` § Test).
 
 ## Glass-box UI requirements
 
